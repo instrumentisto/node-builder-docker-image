@@ -13,3 +13,11 @@ trim_trailing_whitespace = false
 [Dockerfile]
 indent_style = space
 indent_size = 4
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[post_push]
+indent_style = space
+indent_size = 2
