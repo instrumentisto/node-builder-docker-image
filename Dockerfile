@@ -12,4 +12,9 @@ RUN apk add --update --no-cache \
  && rm -rf /var/cache/apk/*
 
 
+VOLUME ["/app"]
+
+WORKDIR /app
+
+
 CMD ["node"]
