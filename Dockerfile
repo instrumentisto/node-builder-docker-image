@@ -1,4 +1,4 @@
-# https://github.com/nodejs/docker-node/blob/a3489450fcd506538ab84174ebedb3cc5c908bc7/7.2/alpine/Dockerfile
+# https://hub.docker.com/_/node/
 FROM node:alpine
 
 MAINTAINER Instrumentisto Team <developer@instrumentisto.com>

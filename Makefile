@@ -1,8 +1,7 @@
 # This Makefile automates possible operations of this project.
 #
 # Images and description on Docker Hub will be automatically rebuilt on
-# pushes to `master` branch of this repo and on updates of
-# parent `node` image.
+# pushes to `master` branch of this repo and on updates of parent image.
 #
 # Note! Docker Hub `post_push` hook must be always up-to-date with default
 # values of current Makefile. To update it just use:
@@ -13,16 +12,11 @@
 
 
 IMAGE_NAME := instrumentisto/node-builder
-VERSION ?= 0.0.2
-TAGS ?= 0.0.2,latest
-
-no-cache ?= no
-
+VERSION ?= 0.1.0
+TAGS ?= 0.1.0,latest
 
 
 comma := ,
-empty :=
-space := $(empty) $(empty)
 eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
                                 $(findstring $(2),$(1))),1)
 
@@ -31,44 +25,53 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Build Docker image.
 #
 # Usage:
-#	make image [no-cache=(yes|no)] [VERSION=]
-
-no-cache-arg = $(if $(call eq, $(no-cache), yes), --no-cache, $(empty))
+#	make image [VERSION=<image-version>]
+#	           [no-cache=(no|yes)]
 
 image:
-	docker build $(no-cache-arg) -t $(IMAGE_NAME):$(VERSION) .
+	docker build --network=host --force-rm \
+		$(if $(call eq,$(no-cache),yes),--no-cache --pull,) \
+		-t $(IMAGE_NAME):$(VERSION) .
 
 
 
 # Tag Docker image with given tags.
 #
 # Usage:
-#	make tags [VERSION=] [TAGS=t1,t2,...]
-
-parsed-tags = $(subst $(comma), $(space), $(TAGS))
+#	make tags [VERSION=<image-version>]
+#	          [TAGS=<docker-tag-1>[,<docker-tag-2>...]]
 
 tags:
-	$(foreach tag, $(parsed-tags), \
-		docker tag $(IMAGE_NAME):$(VERSION) $(IMAGE_NAME):$(tag); \
-	)
+	$(foreach tag,$(subst $(comma), ,$(TAGS)),\
+		$(call tags.do,$(VERSION),$(tag)))
+define tags.do
+	$(eval from := $(strip $(1)))
+	$(eval to := $(strip $(2)))
+	docker tag $(IMAGE_NAME):$(from) $(IMAGE_NAME):$(to)
+endef
+
 
 
 # Manually push Docker images to Docker Hub.
 #
 # Usage:
-#	make push [TAGS=t1,t2,...]
+#	make push [TAGS=<docker-tag-1>[,<docker-tag-2>...]]
 
 push:
-	$(foreach tag, $(parsed-tags), \
-		docker push $(IMAGE_NAME):$(tag); \
-	)
+	$(foreach tag,$(subst $(comma), ,$(TAGS)),\
+		$(call push.do,$(tag)))
+define push.do
+	$(eval tag := $(strip $(1)))
+	docker push $(IMAGE_NAME):$(tag)
+endef
 
 
 
 # Make manual release of Docker images to Docker Hub.
 #
 # Usage:
-#	make manual-release [no-cache=(yes|no)] [VERSION=] [TAGS=t1,t2,...]
+#	make release [VERSION=<image-version>] [no-cache=(no|yes)]
+#	             [TAGS=<docker-tag-1>[,<docker-tag-2>...]]
 
 release: | image tags push
 
@@ -83,48 +86,43 @@ release: | image tags push
 # http://windsock.io/automated-docker-image-builds-with-multiple-tags
 #
 # Usage:
-#	make post-push-hook [TAGS=t1,t2,...]
+#	make post-push-hook [TAGS=<docker-tag-1>[,<docker-tag-2>...]]
 
 post-push-hook:
-	mkdir -p $(PWD)/hooks
-	docker run --rm -i \
-		-v $(PWD)/post_push.j2:/data/post_push.j2:ro \
-		-e TEMPLATE=post_push.j2 \
-		pinterb/jinja2 \
-			image_tags='$(TAGS)' \
-		> $(PWD)/hooks/post_push
+	@mkdir -p hooks/
+	docker run --rm  -v "$(PWD)/post_push.tmpl.php":/post_push.php:ro \
+		php:alpine php -f /post_push.php -- \
+			--image_tags='$(TAGS)' \
+		> hooks/post_push
 
 
 
-# Run tests for Docker image.
+# Run Bats tests for Docker image.
+#
+# Documentation of Bats:
+#	https://github.com/bats-core/bats-core
 #
 # Usage:
-#	make test [VERSION=]
+#	make test [VERSION=<image-version>]
 
-test: deps-test
-	IMAGE=$(IMAGE_NAME):$(VERSION) ./test/bats/bats test/suite.bats
-
-
-
-# Resolve project dependencies for running tests.
-#
-# Usage:
-#	make deps-test [BATS_VER=]
-
-BATS_VER ?= 0.4.0
-
-deps-test:
-ifeq ($(wildcard $(PWD)/test/bats),)
-	mkdir -p $(PWD)/test/bats/vendor
-	wget https://github.com/sstephenson/bats/archive/v$(BATS_VER).tar.gz \
-		-O $(PWD)/test/bats/vendor/bats.tar.gz
-	tar -xzf $(PWD)/test/bats/vendor/bats.tar.gz \
-		-C $(PWD)/test/bats/vendor
-	rm -f $(PWD)/test/bats/vendor/bats.tar.gz
-	ln -s $(PWD)/test/bats/vendor/bats-$(BATS_VER)/libexec/* \
-		$(PWD)/test/bats/
+test:
+ifeq ($(wildcard node_modules/.bin/bats),)
+	@make deps.bats
 endif
+	IMAGE=$(IMAGE_NAME):$(VERSION) node_modules/.bin/bats test/suite.bats
 
 
 
-.PHONY: image tags push release post-push-hook test deps-test
+# Resolve project dependencies for running tests with Yarn.
+#
+# Usage:
+#	make deps.bats
+
+deps.bats:
+	docker run --rm -v "$(PWD)":/app -w /app \
+		node:alpine \
+			yarn install --non-interactive --no-progress
+
+
+
+.PHONY: image tags push release post-push-hook test deps.bats
