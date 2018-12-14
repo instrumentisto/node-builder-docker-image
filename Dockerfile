@@ -8,6 +8,7 @@ RUN apk add --update --no-cache \
             ca-certificates \
             git \
             openjdk8-jre-base \
+            make \
  && update-ca-certificates \
  && rm -rf /var/cache/apk/*
 

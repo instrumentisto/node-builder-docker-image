@@ -60,3 +60,14 @@
   run docker run --rm $IMAGE java -help
   [ "$status" -eq 0 ]
 }
+
+
+@test "contains make" {
+  run docker run --rm $IMAGE which make
+  [ "$status" -eq 0 ]
+}
+
+@test "make runs ok" {
+  run docker run --rm $IMAGE make --help
+  [ "$status" -eq 0 ]
+}
