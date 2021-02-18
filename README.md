@@ -12,6 +12,16 @@ for building projects.
 
 
 
+
+## Status
+
+__PROJECT IS CLOSED AND ARCHIVED. NO MAINTAINING WILL BE CONTINUED.__
+
+Use official Docker images instead.
+
+
+
+
 ## Overview
 
 This image is intended to be used in project build scenarios, such as:
